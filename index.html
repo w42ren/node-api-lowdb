@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Documentation – Try It Now</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f6f8fa;
+      margin: 40px;
+      color: #333;
+    }
+    h1 {
+      color: #222;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    input, textarea, select, button {
+      width: 100%;
+      margin-top: 5px;
+      margin-bottom: 15px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    pre {
+      background: #222;
+      color: #0f0;
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: monospace;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>API Documentation – <code>/v1/data</code></h1>
+  <p>Base URL: <strong>http://localhost:8080</strong></p>
+  <p>This page lets you test your <code>GET</code> and <code>POST</code> requests to the <code>/v1/data</code> endpoint using Bearer token authentication.</p>
+
+  <div class="card">
+    <h2>Authorization</h2>
+    <label for="token">Bearer Token</label>
+    <input type="text" id="token" placeholder="Enter your Bearer token (e.g. mysecrettoken123)" />
+  </div>
+
+  <div class="card">
+    <h2>GET /v1/data</h2>
+    <button onclick="tryGet()">Try GET</button>
+    <pre id="getResponse">(Response will appear here)</pre>
+  </div>
+
+  <div class="card">
+    <h2>POST /v1/data</h2>
+    <label for="postBody">JSON Body</label>
+    <textarea id="postBody" rows="5">{ "name": "Alice", "age": 25 }</textarea>
+    <button onclick="tryPost()">Try POST</button>
+    <pre id="postResponse">(Response will appear here)</pre>
+  </div>
+
+  <script>
+    const baseUrl = 'http://localhost:8080/v1/data';
+
+    async function tryGet() {
+      const token = document.getElementById('token').value.trim();
+      const getResponse = document.getElementById('getResponse');
+      getResponse.textContent = 'Loading...';
+
+      try {
+        const res = await fetch(baseUrl, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        const data = await res.json();
+        getResponse.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        getResponse.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    async function tryPost() {
+      const token = document.getElementById('token').value.trim();
+      const postBody = document.getElementById('postBody').value.trim();
+      const postResponse = document.getElementById('postResponse');
+      postResponse.textContent = 'Loading...';
+
+      try {
+        const res = await fetch(baseUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: postBody,
+        });
+        const data = await res.json();
+        postResponse.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        postResponse.textContent = `Error: ${err.message}`;
+      }
+    }
+  </script>
+
+</body>
+</html>
