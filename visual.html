@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SSH Failures — Time Series & Top IPs</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #121821;
+      --muted: #8ea1b1;
+      --text: #e6edf3;
+      --accent: #4aa3ff;
+      --ok: #2ecc71;
+      --bad: #ff4d4f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      background: radial-gradient(1200px 800px at 20% -10%, #12243a 0%, #0b0f14 60%);
+      color: var(--text);
+    }
+    header {
+      padding: 24px clamp(16px, 4vw, 48px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    header h1 {
+      font-size: clamp(18px, 3vw, 26px);
+      margin: 0;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .controls input, .controls select, .controls button {
+      height: 38px;
+      border: 1px solid #2a3a4a;
+      border-radius: 10px;
+      background: #0f141b;
+      color: var(--text);
+      padding: 0 12px;
+      outline: none;
+    }
+    .controls input::placeholder { color: #6e7e8e; }
+    .controls button {
+      border: 1px solid #2f81f7;
+      cursor: pointer;
+    }
+    .controls button:hover { filter: brightness(1.1); }
+    .wrap {
+      padding: 0 clamp(16px, 4vw, 48px) 40px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+    @media (min-width: 980px) {
+      .grid {
+        grid-template-columns: 2fr 1.2fr;
+        align-items: start;
+      }
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.1));
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+      backdrop-filter: blur(4px);
+    }
+    .card h2 {
+      margin: 4px 0 12px;
+      font-size: 16px;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+    #status {
+      font-size: 13px;
+      color: var(--muted);
+      padding: 0 4px 10px;
+      min-height: 18px;
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .kpi {
+      padding: 10px 12px;
+      background: #0e141c;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      text-align: center;
+    }
+    .kpi .label { font-size: 12px; color: var(--muted); }
+    .kpi .value { font-size: 18px; font-weight: 700; margin-top: 2px; }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      padding: 20px;
+      font-size: 12px;
+    }
+    canvas { width: 100%; height: 360px; }
+    .help {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+      line-height: 1.4;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SSH Failed Login Monitor</h1>
+    <div class="controls">
+      <input id="apiUrl" type="text" size="36" placeholder="API URL (e.g. http://localhost:8080/v1/ssh-failures)" />
+      <input id="token" type="password" size="24" placeholder="Bearer token (if required)" />
+      <select id="limit">
+        <option value="200">Last 200</option>
+        <option value="500" selected>Last 500</option>
+        <option value="1000">Last 1000</option>
+      </select>
+      <button id="loadBtn">Load</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div id="status"></div>
+    <div class="kpis" id="kpis">
+      <div class="kpi"><div class="label">Total Events</div><div class="value" id="kpiEvents">–</div></div>
+      <div class="kpi"><div class="label">Distinct IPs</div><div class="value" id="kpiIPs">–</div></div>
+      <div class="kpi"><div class="label">Distinct Hosts</div><div class="value" id="kpiHosts">–</div></div>
+      <div class="kpi"><div class="label">Alert Windows</div><div class="value" id="kpiAlerts">–</div></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Failed SSH logins per window</h2>
+        <canvas id="tsChart"></canvas>
+        <div class="help">Shows the sum of <code>fail_count</code> across all hosts for each <code>window_start</code>.<br/>Red markers denote windows where any event had <code>alert = true</code>.</div>
+      </div>
+      <div class="card">
+        <h2>Top source IPs by failed logins</h2>
+        <canvas id="topIpChart"></canvas>
+        <div class="help">Aggregated by <code>src_ip</code>, taken from the loaded events. Use the limit control to broaden or narrow the sample.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Built with Chart.js. Place this file next to your Node <code>webServerESM.js</code> and open at <code>http://localhost:8080/</code>.</footer>
+
+  <script>
+    // Persist form inputs
+    const els = {
+      apiUrl: document.getElementById('apiUrl'),
+      token: document.getElementById('token'),
+      limit: document.getElementById('limit'),
+      loadBtn: document.getElementById('loadBtn'),
+      status: document.getElementById('status'),
+      kpiEvents: document.getElementById('kpiEvents'),
+      kpiIPs: document.getElementById('kpiIPs'),
+      kpiHosts: document.getElementById('kpiHosts'),
+      kpiAlerts: document.getElementById('kpiAlerts'),
+    };
+
+    // Default to same origin if served by Node
+    const defaultUrl = `${location.origin}/v1/ssh-failures`;
+    els.apiUrl.value = localStorage.getItem('ssh_api_url') || defaultUrl;
+    els.token.value = localStorage.getItem('ssh_api_token') || '';
+    els.limit.value = localStorage.getItem('ssh_api_limit') || '500';
+
+    els.loadBtn.addEventListener('click', () => {
+      localStorage.setItem('ssh_api_url', els.apiUrl.value.trim());
+      localStorage.setItem('ssh_api_token', els.token.value.trim());
+      localStorage.setItem('ssh_api_limit', els.limit.value);
+      loadData();
+    });
+
+    // Chart instances
+    let currentAbortController = null;
+
+    let tsChart, topIpChart;
+
+    function destroyIfExists(canvasId) {
+      try {
+        const chart = Chart.getChart(canvasId);
+        if (chart) chart.destroy();
+      } catch {}
+    }
+
+    function setStatus(msg, isError=false) {
+      els.status.textContent = msg || '';
+      els.status.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+    }
+
+    async function loadData() {
+      const base = els.apiUrl.value.trim() || defaultUrl;
+      const limit = parseInt(els.limit.value, 10) || 500;
+      const url = new URL(base);
+      url.searchParams.set('limit', String(limit));
+
+      const headers = { 'Accept': 'application/json' };
+      const tok = els.token.value.trim();
+      if (tok) headers['Authorization'] = `Bearer ${tok}`;
+
+      setStatus('Loading…');
+      try {
+        // Abort any in-flight request to avoid overlapping renders
+        if (currentAbortController) {
+          currentAbortController.abort();
+        }
+        currentAbortController = new AbortController();
+        const res = await fetch(url, { headers, signal: currentAbortController.signal });
+        if (!res.ok) {
+          const txt = await res.text().catch(()=>'');
+          setStatus(`Error ${res.status} ${res.statusText} — ${txt}`, true);
+          return;
+        }
+        const data = await res.json();
+        if (!data || !Array.isArray(data.items)) {
+          setStatus('Unexpected response shape.', true);
+          return;
+        }
+        setStatus(`Loaded ${data.items.length} events.`);
+        renderCharts(data.items);
+        updateKPIs(data.items);
+      } catch (e) {
+        setStatus(`Fetch failed: ${e}`, true);
+      }
+    }
+
+    function updateKPIs(items) {
+      const ips = new Set(items.map(i => i.src_ip));
+      const hosts = new Set(items.map(i => i.host));
+      const alerts = items.filter(i => i.alert).length;
+      els.kpiEvents.textContent = items.length.toLocaleString();
+      els.kpiIPs.textContent = ips.size.toLocaleString();
+      els.kpiHosts.textContent = hosts.size.toLocaleString();
+      els.kpiAlerts.textContent = alerts.toLocaleString();
+    }
+
+    function aggregateTimeSeries(items) {
+      // Sum fail_count by window_start (ISO string). Keep an alert flag per window.
+      const map = new Map();
+      for (const it of items) {
+        const k = it.window_start;
+        const prev = map.get(k) || { count: 0, alert: false };
+        prev.count += Number(it.fail_count || 0);
+        prev.alert = prev.alert || !!it.alert;
+        map.set(k, prev);
+      }
+      const points = [];
+      for (const [iso, v] of map.entries()) {
+        const t = new Date(iso);
+        if (!isFinite(t)) continue;
+        points.push({ x: t, y: v.count, alert: v.alert });
+      }
+      points.sort((a,b) => a.x - b.x);
+      return points;
+    }
+
+    function aggregateTopIPs(items, topN = 10) {
+      const map = new Map();
+      for (const it of items) {
+        const ip = it.src_ip || 'unknown';
+        map.set(ip, (map.get(ip) || 0) + Number(it.fail_count || 0));
+      }
+      const rows = Array.from(map.entries()).sort((a,b) => b[1]-a[1]).slice(0, topN);
+      return { labels: rows.map(r=>r[0]), counts: rows.map(r=>r[1]) };
+    }
+
+    function renderCharts(items) {
+      const tsData = aggregateTimeSeries(items);
+      const top = aggregateTopIPs(items, 10);
+
+      // Time-series main dataset
+      const tsDataset = {
+        label: 'Failed logins',
+        data: tsData.map(p => ({ x: p.x, y: p.y })),
+        fill: true,
+        tension: 0.25,
+        pointRadius: 2,
+      };
+      // Scatter overlay for alert windows
+      const alertDataset = {
+        type: 'scatter',
+        label: 'Alert windows',
+        data: tsData.filter(p => p.alert).map(p => ({ x: p.x, y: p.y })),
+        pointBackgroundColor: '#ff4d4f',
+        pointBorderColor: '#ff4d4f',
+        pointRadius: 4,
+      };
+
+      // Create or update time-series chart
+      destroyIfExists('tsChart');
+      if (tsChart) tsChart.destroy();
+      tsChart = new Chart(document.getElementById('tsChart'), {
+        type: 'line',
+        data: { datasets: [tsDataset, alertDataset] },
+        options: {
+          responsive: true,
+          interaction: { mode: 'nearest', intersect: false },
+          scales: {
+            x: {
+              type: 'time',
+              time: { tooltipFormat: 'yyyy-MM-dd HH:mm' }
+            },
+            y: {
+              beginAtZero: true,
+              title: { text: 'Failed logins', display: true }
+            }
+          },
+          plugins: {
+            legend: { labels: { boxWidth: 12 } },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  const v = ctx.parsed.y;
+                  return `${ctx.dataset.label}: ${v}`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Create or update Top IPs bar chart
+      destroyIfExists('topIpChart');
+      if (topIpChart) topIpChart.destroy();
+      topIpChart = new Chart(document.getElementById('topIpChart'), {
+        type: 'bar',
+        data: {
+          labels: top.labels,
+          datasets: [{
+            label: 'Failed logins',
+            data: top.counts,
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          scales: {
+            x: { beginAtZero: true, title: { text: 'Count', display: true } },
+            y: { title: { text: 'Source IP', display: true } }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` ${ctx.raw} failed logins`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Auto-load on first paint
+    window.addEventListener('DOMContentLoaded', () => {
+      loadData();
+    });
+  </script>
+</body>
+</html>

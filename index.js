@@ -1,1 +1,1 @@
-console.log('Hello from Node.js!');
+import('./webServerESM.js');

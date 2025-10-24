@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>API Documentation – Try It Now</title>
   <style>
     body {
@@ -10,25 +10,38 @@
       background: #f6f8fa;
       margin: 40px;
       color: #333;
+      line-height: 1.45;
     }
-    h1 {
-      color: #222;
+    h1 { color: #222; margin-bottom: 6px; }
+    .muted { color: #666; font-size: 14px; margin-bottom: 20px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
     }
     .card {
       background: white;
       border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
       padding: 20px;
       margin-bottom: 20px;
     }
+    .card h2 { margin-top: 0; }
+    label { font-weight: 600; font-size: 14px; }
     input, textarea, select, button {
       width: 100%;
-      margin-top: 5px;
-      margin-bottom: 15px;
+      margin-top: 6px;
+      margin-bottom: 14px;
       padding: 10px;
       border: 1px solid #ccc;
       border-radius: 6px;
       font-size: 14px;
+    }
+    input[type="checkbox"] { width: auto; margin-right: 8px; }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
     }
     button {
       background: #007bff;
@@ -37,89 +50,268 @@
       cursor: pointer;
       font-weight: bold;
     }
-    button:hover {
-      background: #0056b3;
-    }
+    button:hover { background: #0056b3; }
     pre {
-      background: #222;
+      background: #111;
       color: #0f0;
       padding: 15px;
       border-radius: 6px;
       overflow-x: auto;
-      font-family: monospace;
-      font-size: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+      max-height: 360px;
+    }
+    .small { font-size: 12px; color: #555; }
+    code.inline {
+      background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 90%;
     }
   </style>
 </head>
 <body>
 
-  <h1>API Documentation – <code>/v1/data</code></h1>
-  <p>Base URL: <strong>http://localhost:8080</strong></p>
-  <p>This page lets you test your <code>GET</code> and <code>POST</code> requests to the <code>/v1/data</code> endpoint using Bearer token authentication.</p>
+  <h1>API Documentation</h1>
+  <div class="muted">
+    Base URL: <strong>http://localhost:8080</strong> &nbsp;|&nbsp; All protected endpoints require header
+    <code class="inline">Authorization: Bearer &lt;token&gt;</code>.
+  </div>
 
+  <!-- Auth -->
   <div class="card">
     <h2>Authorization</h2>
     <label for="token">Bearer Token</label>
     <input type="text" id="token" placeholder="Enter your Bearer token (e.g. mysecrettoken123)" />
   </div>
 
+  <!-- ========= /v1/data ========= -->
   <div class="card">
-    <h2>GET /v1/data</h2>
-    <button onclick="tryGet()">Try GET</button>
-    <pre id="getResponse">(Response will appear here)</pre>
+    <h2><code>/v1/data</code> – Test Payload Store</h2>
+    <p class="small">Use this to sanity-check your token and LowDB wiring.</p>
+
+    <div class="grid">
+      <div>
+        <h3>GET /v1/data</h3>
+        <button onclick="tryGetData()">Try GET</button>
+        <pre id="getDataResponse">(Response will appear here)</pre>
+      </div>
+      <div>
+        <h3>POST /v1/data</h3>
+        <label for="postDataBody">JSON Body</label>
+        <textarea id="postDataBody" rows="6">{ "name": "Alice", "age": 25 }</textarea>
+        <button onclick="tryPostData()">Try POST</button>
+        <pre id="postDataResponse">(Response will appear here)</pre>
+      </div>
+    </div>
   </div>
 
+  <!-- ========= /v1/ssh-failures ========= -->
   <div class="card">
-    <h2>POST /v1/data</h2>
-    <label for="postBody">JSON Body</label>
-    <textarea id="postBody" rows="5">{ "name": "Alice", "age": 25 }</textarea>
-    <button onclick="tryPost()">Try POST</button>
-    <pre id="postResponse">(Response will appear here)</pre>
+    <h2><code>/v1/ssh-failures</code> – SSH Failed Login Aggregates</h2>
+    <p class="small">
+      Accepts a single JSON object or an array. Validation requires either
+      <code class="inline">timestamp</code> or <code class="inline">window_start</code>/<code class="inline">window_end</code>,
+      and <code class="inline">src_ip</code> (or <code class="inline">ip</code>).
+      Optional header: <code class="inline">Idempotency-Key</code> to prevent duplicate inserts.
+    </p>
+
+    <div class="grid">
+      <!-- GET -->
+      <div>
+        <h3>GET /v1/ssh-failures</h3>
+        <div class="row">
+          <div>
+            <label for="sshLimit">limit (1..1000)</label>
+            <input type="number" id="sshLimit" value="10" min="1" max="1000"/>
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button onclick="tryGetSSH()">Try GET</button>
+          </div>
+        </div>
+        <pre id="getSSHResponse">(Response will appear here)</pre>
+      </div>
+
+      <!-- POST single -->
+      <div>
+        <h3>POST /v1/ssh-failures (single)</h3>
+        <label for="sshIdem">Idempotency-Key (optional)</label>
+        <input type="text" id="sshIdem" placeholder="e.g. demo-key-123 (optional)"/>
+        <label for="sshPostBody">JSON Body</label>
+        <textarea id="sshPostBody" rows="12">{
+  "event_type": "ssh_failed_agg",
+  "host": "web01",
+  "src_ip": "203.0.113.5",
+  "fail_count": 4,
+  "timestamp": "2025-10-23T09:25:00Z",
+  "window_start": "2025-10-23T09:25:00Z",
+  "window_end": "2025-10-23T09:30:00Z",
+  "asset": {
+    "hostname": "web01",
+    "ip": "10.0.0.10",
+    "env": "prod",
+    "owner": "platform",
+    "function": "frontend",
+    "criticality": 4
+  },
+  "threshold": 5,
+  "alert": false,
+  "enrichment_version": "v1"
+}</textarea>
+        <button onclick="tryPostSSH()">Try POST (single)</button>
+        <pre id="postSSHResponse">(Response will appear here)</pre>
+      </div>
+
+      <!-- POST batch -->
+      <div>
+        <h3>POST /v1/ssh-failures (batch array)</h3>
+        <label class="small">
+          <input type="checkbox" id="sshAutofillBatch" checked />
+          Autofill with two sample events
+        </label>
+        <label for="sshPostBatchBody">JSON Array Body</label>
+        <textarea id="sshPostBatchBody" rows="12">[
+  {
+    "event_type": "ssh_failed_agg",
+    "host": "web01",
+    "src_ip": "203.0.113.5",
+    "fail_count": 4,
+    "timestamp": "2025-10-23T09:25:00Z",
+    "window_start": "2025-10-23T09:25:00Z",
+    "window_end": "2025-10-23T09:30:00Z",
+    "threshold": 5,
+    "alert": false
+  },
+  {
+    "event_type": "ssh_failed_agg",
+    "host": "bastion-1",
+    "src_ip": "198.51.100.77",
+    "fail_count": 9,
+    "timestamp": "2025-10-23T09:25:00Z",
+    "window_start": "2025-10-23T09:25:00Z",
+    "window_end": "2025-10-23T09:30:00Z",
+    "threshold": 3,
+    "alert": true
+  }
+]</textarea>
+        <button onclick="tryPostSSHBatch()">Try POST (batch)</button>
+        <pre id="postSSHBatchResponse">(Response will appear here)</pre>
+      </div>
+    </div>
+
+    <p class="small">
+      <strong>Notes</strong>:
+      1) If you omit <code class="inline">timestamp</code> but include <code class="inline">window_start</code>, the server normalises and stores <code class="inline">timestamp = window_start</code>.
+      2) Server de-duplicates on a composite key or <code class="inline">Idempotency-Key</code> and may respond <code class="inline">409</code> for duplicates (treated as OK).
+    </p>
   </div>
 
   <script>
-    const baseUrl = 'http://localhost:8080/v1/data';
+    // Base URLs
+    const BASE = 'http://localhost:8080';
+    const URL_DATA = `${BASE}/v1/data`;
+    const URL_SSH  = `${BASE}/v1/ssh-failures`;
 
-    async function tryGet() {
-      const token = document.getElementById('token').value.trim();
-      const getResponse = document.getElementById('getResponse');
-      getResponse.textContent = 'Loading...';
+    // Helpers
+    const j = (id) => document.getElementById(id);
+    const auth = () => `Bearer ${j('token').value.trim()}`;
 
+    // ---------- /v1/data ----------
+    async function tryGetData() {
+      const out = j('getDataResponse');
+      out.textContent = 'Loading...';
       try {
-        const res = await fetch(baseUrl, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+        const res = await fetch(URL_DATA, {
+          headers: { 'Authorization': auth() }
         });
         const data = await res.json();
-        getResponse.textContent = JSON.stringify(data, null, 2);
-      } catch (err) {
-        getResponse.textContent = `Error: ${err.message}`;
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        out.textContent = `Error: ${e.message}`;
       }
     }
 
-    async function tryPost() {
-      const token = document.getElementById('token').value.trim();
-      const postBody = document.getElementById('postBody').value.trim();
-      const postResponse = document.getElementById('postResponse');
-      postResponse.textContent = 'Loading...';
-
+    async function tryPostData() {
+      const out = j('postDataResponse');
+      out.textContent = 'Loading...';
       try {
-        const res = await fetch(baseUrl, {
+        const body = j('postDataBody').value.trim();
+        const res = await fetch(URL_DATA, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
+            'Authorization': auth(),
+            'Content-Type': 'application/json'
           },
-          body: postBody,
+          body
         });
         const data = await res.json();
-        postResponse.textContent = JSON.stringify(data, null, 2);
-      } catch (err) {
-        postResponse.textContent = `Error: ${err.message}`;
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        out.textContent = `Error: ${e.message}`;
+      }
+    }
+
+    // ---------- /v1/ssh-failures ----------
+    async function tryGetSSH() {
+      const out = j('getSSHResponse');
+      out.textContent = 'Loading...';
+      const limit = Math.max(1, Math.min(parseInt(j('sshLimit').value || '10', 10), 1000));
+      try {
+        const res = await fetch(`${URL_SSH}?limit=${limit}`, {
+          headers: { 'Authorization': auth() }
+        });
+        const data = await res.json();
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        out.textContent = `Error: ${e.message}`;
+      }
+    }
+
+    async function tryPostSSH() {
+      const out = j('postSSHResponse');
+      out.textContent = 'Loading...';
+      try {
+        const body = j('sshPostBody').value.trim();
+        const headers = {
+          'Authorization': auth(),
+          'Content-Type': 'application/json'
+        };
+        const idem = j('sshIdem').value.trim();
+        if (idem) headers['Idempotency-Key'] = idem;
+
+        const res = await fetch(URL_SSH, {
+          method: 'POST',
+          headers,
+          body
+        });
+        const data = await res.json();
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        out.textContent = `Error: ${e.message}`;
+      }
+    }
+
+    async function tryPostSSHBatch() {
+      const out = j('postSSHBatchResponse');
+      out.textContent = 'Loading...';
+      try {
+        // Optionally autofill (kept as a no-op since the textarea already has a sample)
+        const body = j('sshPostBatchBody').value.trim();
+
+        const res = await fetch(URL_SSH, {
+          method: 'POST',
+          headers: {
+            'Authorization': auth(),
+            'Content-Type': 'application/json'
+          },
+          body
+        });
+        const data = await res.json();
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        out.textContent = `Error: ${e.message}`;
       }
     }
   </script>
 
 </body>
 </html>
+  
