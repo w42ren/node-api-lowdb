@@ -1,317 +1,460 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>API Documentation – Try It Now</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SSH Failures — SOC Mini Dashboard</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f6f8fa;
-      margin: 40px;
-      color: #333;
-      line-height: 1.45;
+    :root {
+      --bg: #0b0f14;
+      --panel: #121821;
+      --muted: #8ea1b1;
+      --text: #e6edf3;
+      --accent: #4aa3ff;
+      --ok: #2ecc71;
+      --bad: #ff4d4f;
     }
-    h1 { color: #222; margin-bottom: 6px; }
-    .muted { color: #666; font-size: 14px; margin-bottom: 20px; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      background: radial-gradient(1200px 800px at 20% -10%, #12243a 0%, #0b0f14 60%);
+      color: var(--text);
+    }
+    header {
+      padding: 24px clamp(16px, 4vw, 48px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    header h1 {
+      font-size: clamp(18px, 3vw, 26px);
+      margin: 0;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .controls input, .controls select, .controls button {
+      height: 38px;
+      border: 1px solid #2a3a4a;
+      border-radius: 10px;
+      background: #0f141b;
+      color: var(--text);
+      padding: 0 12px;
+      outline: none;
+    }
+    .controls input::placeholder { color: #6e7e8e; }
+    .controls button {
+      border: 1px solid #2f81f7;
+      cursor: pointer;
+    }
+    .controls button:hover { filter: brightness(1.1); }
+    .wrap {
+      padding: 0 clamp(16px, 4vw, 48px) 40px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 20px;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+    @media (min-width: 980px) {
+      .grid {
+        grid-template-columns: 2fr 1.2fr;
+        align-items: start;
+      }
     }
     .card {
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      padding: 20px;
-      margin-bottom: 20px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.1));
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+      backdrop-filter: blur(4px);
     }
-    .card h2 { margin-top: 0; }
-    label { font-weight: 600; font-size: 14px; }
-    input, textarea, select, button {
-      width: 100%;
-      margin-top: 6px;
-      margin-bottom: 14px;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 14px;
+    .card h2 {
+      margin: 4px 0 12px;
+      font-size: 16px;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0.2px;
     }
-    input[type="checkbox"] { width: auto; margin-right: 8px; }
-    .row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-    button {
-      background: #007bff;
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    button:hover { background: #0056b3; }
-    pre {
-      background: #111;
-      color: #0f0;
-      padding: 15px;
-      border-radius: 6px;
-      overflow-x: auto;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    #status {
       font-size: 13px;
-      max-height: 360px;
+      color: var(--muted);
+      padding: 0 4px 10px;
+      min-height: 18px;
     }
-    .small { font-size: 12px; color: #555; }
-    code.inline {
-      background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 90%;
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 10px;
+      margin-top: 6px;
     }
+    .kpi {
+      padding: 10px 12px;
+      background: #0e141c;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      text-align: center;
+    }
+    .kpi .label { font-size: 12px; color: var(--muted); }
+    .kpi .value { font-size: 18px; font-weight: 700; margin-top: 2px; }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      padding: 20px;
+      font-size: 12px;
+    }
+    canvas { width: 100%; height: 360px; }
+    .help {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+      line-height: 1.4;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-
-  <h1>API Documentation</h1>
-  <div class="muted">
-    Base URL: <strong>http://localhost:8080</strong> &nbsp;|&nbsp; All protected endpoints require header
-    <code class="inline">Authorization: Bearer &lt;token&gt;</code>.
-  </div>
-
-  <!-- Auth -->
-  <div class="card">
-    <h2>Authorization</h2>
-    <label for="token">Bearer Token</label>
-    <input type="text" id="token" placeholder="Enter your Bearer token (e.g. mysecrettoken123)" />
-  </div>
-
-  <!-- ========= /v1/data ========= -->
-  <div class="card">
-    <h2><code>/v1/data</code> – Test Payload Store</h2>
-    <p class="small">Use this to sanity-check your token and LowDB wiring.</p>
-
-    <div class="grid">
-      <div>
-        <h3>GET /v1/data</h3>
-        <button onclick="tryGetData()">Try GET</button>
-        <pre id="getDataResponse">(Response will appear here)</pre>
-      </div>
-      <div>
-        <h3>POST /v1/data</h3>
-        <label for="postDataBody">JSON Body</label>
-        <textarea id="postDataBody" rows="6">{ "name": "Alice", "age": 25 }</textarea>
-        <button onclick="tryPostData()">Try POST</button>
-        <pre id="postDataResponse">(Response will appear here)</pre>
-      </div>
+  <header>
+    <h1>SSH Failed Login Monitor</h1>
+    <div class="controls">
+      <input id="apiUrl" type="text" size="36" placeholder="API URL (e.g. http://localhost:8080/v1/ssh-failures)" />
+      <input id="token" type="password" size="24" placeholder="Bearer token (if required)" />
+      <select id="limit">
+        <option value="200">Last 200</option>
+        <option value="500" selected>Last 500</option>
+        <option value="1000">Last 1000</option>
+      </select>
+      <button id="loadBtn">Load</button>
     </div>
-  </div>
+  </header>
 
-  <!-- ========= /v1/ssh-failures ========= -->
-  <div class="card">
-    <h2><code>/v1/ssh-failures</code> – SSH Failed Login Aggregates</h2>
-    <p class="small">
-      Accepts a single JSON object or an array. Validation requires either
-      <code class="inline">timestamp</code> or <code class="inline">window_start</code>/<code class="inline">window_end</code>,
-      and <code class="inline">src_ip</code> (or <code class="inline">ip</code>).
-      Optional header: <code class="inline">Idempotency-Key</code> to prevent duplicate inserts.
-    </p>
+  <div class="wrap">
+    <div id="status"></div>
+    <div class="kpis" id="kpis">
+      <div class="kpi"><div class="label">Total Events</div><div class="value" id="kpiEvents">–</div></div>
+      <div class="kpi"><div class="label">Distinct IPs</div><div class="value" id="kpiIPs">–</div></div>
+      <div class="kpi"><div class="label">Distinct Hosts</div><div class="value" id="kpiHosts">–</div></div>
+      <div class="kpi"><div class="label">Alert Windows</div><div class="value" id="kpiAlerts">–</div></div>
+    </div>
 
     <div class="grid">
-      <!-- GET -->
-      <div>
-        <h3>GET /v1/ssh-failures</h3>
-        <div class="row">
-          <div>
-            <label for="sshLimit">limit (1..1000)</label>
-            <input type="number" id="sshLimit" value="10" min="1" max="1000"/>
-          </div>
-          <div>
-            <label>&nbsp;</label>
-            <button onclick="tryGetSSH()">Try GET</button>
-          </div>
-        </div>
-        <pre id="getSSHResponse">(Response will appear here)</pre>
+      <div class="card">
+        <h2>Failed SSH logins per window</h2>
+        <canvas id="tsChart"></canvas>
+        <div class="help">Shows the sum of <code>fail_count</code> across all hosts for each <code>window_start</code>.<br/>Red markers denote windows where any event had <code>alert = true</code>.</div>
       </div>
-
-      <!-- POST single -->
-      <div>
-        <h3>POST /v1/ssh-failures (single)</h3>
-        <label for="sshIdem">Idempotency-Key (optional)</label>
-        <input type="text" id="sshIdem" placeholder="e.g. demo-key-123 (optional)"/>
-        <label for="sshPostBody">JSON Body</label>
-        <textarea id="sshPostBody" rows="12">{
-  "event_type": "ssh_failed_agg",
-  "host": "web01",
-  "src_ip": "203.0.113.5",
-  "fail_count": 4,
-  "timestamp": "2025-10-23T09:25:00Z",
-  "window_start": "2025-10-23T09:25:00Z",
-  "window_end": "2025-10-23T09:30:00Z",
-  "asset": {
-    "hostname": "web01",
-    "ip": "10.0.0.10",
-    "env": "prod",
-    "owner": "platform",
-    "function": "frontend",
-    "criticality": 4
-  },
-  "threshold": 5,
-  "alert": false,
-  "enrichment_version": "v1"
-}</textarea>
-        <button onclick="tryPostSSH()">Try POST (single)</button>
-        <pre id="postSSHResponse">(Response will appear here)</pre>
-      </div>
-
-      <!-- POST batch -->
-      <div>
-        <h3>POST /v1/ssh-failures (batch array)</h3>
-        <label class="small">
-          <input type="checkbox" id="sshAutofillBatch" checked />
-          Autofill with two sample events
-        </label>
-        <label for="sshPostBatchBody">JSON Array Body</label>
-        <textarea id="sshPostBatchBody" rows="12">[
-  {
-    "event_type": "ssh_failed_agg",
-    "host": "web01",
-    "src_ip": "203.0.113.5",
-    "fail_count": 4,
-    "timestamp": "2025-10-23T09:25:00Z",
-    "window_start": "2025-10-23T09:25:00Z",
-    "window_end": "2025-10-23T09:30:00Z",
-    "threshold": 5,
-    "alert": false
-  },
-  {
-    "event_type": "ssh_failed_agg",
-    "host": "bastion-1",
-    "src_ip": "198.51.100.77",
-    "fail_count": 9,
-    "timestamp": "2025-10-23T09:25:00Z",
-    "window_start": "2025-10-23T09:25:00Z",
-    "window_end": "2025-10-23T09:30:00Z",
-    "threshold": 3,
-    "alert": true
-  }
-]</textarea>
-        <button onclick="tryPostSSHBatch()">Try POST (batch)</button>
-        <pre id="postSSHBatchResponse">(Response will appear here)</pre>
+      <div class="card">
+        <h2>Top source IPs by failed logins</h2>
+        <canvas id="topIpChart"></canvas>
+        <div class="help">Aggregated by <code>src_ip</code>, taken from the loaded events. Use the limit control to broaden or narrow the sample.</div>
       </div>
     </div>
 
-    <p class="small">
-      <strong>Notes</strong>:
-      1) If you omit <code class="inline">timestamp</code> but include <code class="inline">window_start</code>, the server normalises and stores <code class="inline">timestamp = window_start</code>.
-      2) Server de-duplicates on a composite key or <code class="inline">Idempotency-Key</code> and may respond <code class="inline">409</code> for duplicates (treated as OK).
-    </p>
+    <div class="card">
+      <h2>Alert rate by asset criticality</h2>
+      <canvas id="critChart"></canvas>
+      <div class="help">Shows the percentage of windows that raised an alert within each <code>asset.criticality</code> bucket (1–5). Stacked to 100%: Alert vs Non‑alert.</div>
+    </div>
   </div>
+
+  <footer>Built with Chart.js. Place this file next to your Node <code>webServerESM.js</code> and open at <code>http://localhost:8080/</code>.</footer>
 
   <script>
-    // Base URLs
-    const BASE = 'http://localhost:8080';
-    const URL_DATA = `${BASE}/v1/data`;
-    const URL_SSH  = `${BASE}/v1/ssh-failures`;
+    // Persist form inputs
+    const els = {
+      apiUrl: document.getElementById('apiUrl'),
+      token: document.getElementById('token'),
+      limit: document.getElementById('limit'),
+      loadBtn: document.getElementById('loadBtn'),
+      status: document.getElementById('status'),
+      kpiEvents: document.getElementById('kpiEvents'),
+      kpiIPs: document.getElementById('kpiIPs'),
+      kpiHosts: document.getElementById('kpiHosts'),
+      kpiAlerts: document.getElementById('kpiAlerts'),
+    };
 
-    // Helpers
-    const j = (id) => document.getElementById(id);
-    const auth = () => `Bearer ${j('token').value.trim()}`;
+    // Default to same origin if served by Node
+    const defaultUrl = `${location.origin}/v1/ssh-failures`;
+    els.apiUrl.value = localStorage.getItem('ssh_api_url') || defaultUrl;
+    els.token.value = localStorage.getItem('ssh_api_token') || '';
+    els.limit.value = localStorage.getItem('ssh_api_limit') || '500';
 
-    // ---------- /v1/data ----------
-    async function tryGetData() {
-      const out = j('getDataResponse');
-      out.textContent = 'Loading...';
+    els.loadBtn.addEventListener('click', () => {
+      localStorage.setItem('ssh_api_url', els.apiUrl.value.trim());
+      localStorage.setItem('ssh_api_token', els.token.value.trim());
+      localStorage.setItem('ssh_api_limit', els.limit.value);
+      loadData();
+    });
+
+    // Chart instances
+    let tsChart, topIpChart, critChart;
+    let currentAbortController = null;
+
+    function destroyIfExists(canvasId) {
       try {
-        const res = await fetch(URL_DATA, {
-          headers: { 'Authorization': auth() }
-        });
+        const chart = Chart.getChart(canvasId);
+        if (chart) chart.destroy();
+      } catch {}
+    }
+
+    function setStatus(msg, isError=false) {
+      els.status.textContent = msg || '';
+      els.status.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+    }
+
+    async function loadData() {
+      const base = els.apiUrl.value.trim() || defaultUrl;
+      const limit = parseInt(els.limit.value, 10) || 500;
+      const url = new URL(base);
+      url.searchParams.set('limit', String(limit));
+
+      const headers = { 'Accept': 'application/json' };
+      const tok = els.token.value.trim();
+      if (tok) headers['Authorization'] = `Bearer ${tok}`;
+
+      setStatus('Loading…');
+      try {
+        if (currentAbortController) currentAbortController.abort();
+        currentAbortController = new AbortController();
+        const res = await fetch(url, { headers, signal: currentAbortController.signal });
+        if (!res.ok) {
+          const txt = await res.text().catch(()=>'');
+          setStatus(`Error ${res.status} ${res.statusText} — ${txt}`, true);
+          return;
+        }
         const data = await res.json();
-        out.textContent = JSON.stringify(data, null, 2);
+        if (!data || !Array.isArray(data.items)) {
+          setStatus('Unexpected response shape.', true);
+          return;
+        }
+        setStatus(`Loaded ${data.items.length} events.`);
+        renderCharts(data.items);
+        updateKPIs(data.items);
       } catch (e) {
-        out.textContent = `Error: ${e.message}`;
+        setStatus(`Fetch failed: ${e}`, true);
       }
     }
 
-    async function tryPostData() {
-      const out = j('postDataResponse');
-      out.textContent = 'Loading...';
-      try {
-        const body = j('postDataBody').value.trim();
-        const res = await fetch(URL_DATA, {
-          method: 'POST',
-          headers: {
-            'Authorization': auth(),
-            'Content-Type': 'application/json'
+    function updateKPIs(items) {
+      const ips = new Set(items.map(i => i.src_ip));
+      const hosts = new Set(items.map(i => i.host));
+      const alerts = items.filter(i => i.alert).length;
+      els.kpiEvents.textContent = items.length.toLocaleString();
+      els.kpiIPs.textContent = ips.size.toLocaleString();
+      els.kpiHosts.textContent = hosts.size.toLocaleString();
+      els.kpiAlerts.textContent = alerts.toLocaleString();
+    }
+
+    function aggregateTimeSeries(items) {
+      const map = new Map();
+      for (const it of items) {
+        const k = it.window_start;
+        const prev = map.get(k) || { count: 0, alert: false };
+        prev.count += Number(it.fail_count || 0);
+        prev.alert = prev.alert || !!it.alert;
+        map.set(k, prev);
+      }
+      const points = [];
+      for (const [iso, v] of map.entries()) {
+        const t = new Date(iso);
+        if (!isFinite(t)) continue;
+        points.push({ x: t, y: v.count, alert: v.alert });
+      }
+      points.sort((a,b) => a.x - b.x);
+      return points;
+    }
+
+    function aggregateTopIPs(items, topN = 10) {
+      const map = new Map();
+      for (const it of items) {
+        const ip = it.src_ip || 'unknown';
+        map.set(ip, (map.get(ip) || 0) + Number(it.fail_count || 0));
+      }
+      const rows = Array.from(map.entries()).sort((a,b) => b[1]-a[1]).slice(0, topN);
+      return { labels: rows.map(r=>r[0]), counts: rows.map(r=>r[1]) };
+    }
+
+    function aggregateCriticality(items) {
+      const buckets = new Map(); // crit -> {total, alerts}
+      for (const it of items) {
+        const c = it.asset && typeof it.asset.criticality !== 'undefined'
+          ? String(it.asset.criticality)
+          : 'unknown';
+        const b = buckets.get(c) || { total: 0, alerts: 0 };
+        b.total += 1;
+        if (it.alert) b.alerts += 1;
+        buckets.set(c, b);
+      }
+      const labels = Array.from(buckets.keys()).sort((a,b) => {
+        const na = Number(a), nb = Number(b);
+        const an = Number.isFinite(na), bn = Number.isFinite(nb);
+        if (an && bn) return na - nb;
+        if (an) return -1;
+        if (bn) return 1;
+        return String(a).localeCompare(String(b));
+      });
+      const alertPct = [];
+      const okPct = [];
+      const alertCnt = [];
+      const totalCnt = [];
+      for (const lab of labels) {
+        const { total, alerts } = buckets.get(lab);
+        const pct = total ? (alerts / total) * 100 : 0;
+        alertPct.push(pct);
+        okPct.push(100 - pct);
+        alertCnt.push(alerts);
+        totalCnt.push(total);
+      }
+      return { labels, alertPct, okPct, alertCnt, totalCnt };
+    }
+
+    function renderCharts(items) {
+      const tsData = aggregateTimeSeries(items);
+      const top = aggregateTopIPs(items, 10);
+
+      // Time-series main dataset
+      const tsDataset = {
+        label: 'Failed logins',
+        data: tsData.map(p => ({ x: p.x, y: p.y })),
+        fill: true,
+        tension: 0.25,
+        pointRadius: 2,
+      };
+      // Scatter overlay for alert windows
+      const alertDataset = {
+        type: 'scatter',
+        label: 'Alert windows',
+        data: tsData.filter(p => p.alert).map(p => ({ x: p.x, y: p.y })),
+        pointBackgroundColor: '#ff4d4f',
+        pointBorderColor: '#ff4d4f',
+        pointRadius: 4,
+      };
+
+      // Create or update time-series chart
+      destroyIfExists('tsChart');
+      if (tsChart) tsChart.destroy();
+      tsChart = new Chart(document.getElementById('tsChart'), {
+        type: 'line',
+        data: { datasets: [tsDataset, alertDataset] },
+        options: {
+          responsive: true,
+          interaction: { mode: 'nearest', intersect: false },
+          scales: {
+            x: {
+              type: 'time',
+              time: { tooltipFormat: 'yyyy-MM-dd HH:mm' }
+            },
+            y: {
+              beginAtZero: true,
+              title: { text: 'Failed logins', display: true }
+            }
           },
-          body
-        });
-        const data = await res.json();
-        out.textContent = JSON.stringify(data, null, 2);
-      } catch (e) {
-        out.textContent = `Error: ${e.message}`;
-      }
-    }
+          plugins: {
+            legend: { labels: { boxWidth: 12 } },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  const v = ctx.parsed.y;
+                  return `${ctx.dataset.label}: ${v}`;
+                }
+              }
+            }
+          }
+        }
+      });
 
-    // ---------- /v1/ssh-failures ----------
-    async function tryGetSSH() {
-      const out = j('getSSHResponse');
-      out.textContent = 'Loading...';
-      const limit = Math.max(1, Math.min(parseInt(j('sshLimit').value || '10', 10), 1000));
-      try {
-        const res = await fetch(`${URL_SSH}?limit=${limit}`, {
-          headers: { 'Authorization': auth() }
-        });
-        const data = await res.json();
-        out.textContent = JSON.stringify(data, null, 2);
-      } catch (e) {
-        out.textContent = `Error: ${e.message}`;
-      }
-    }
-
-    async function tryPostSSH() {
-      const out = j('postSSHResponse');
-      out.textContent = 'Loading...';
-      try {
-        const body = j('sshPostBody').value.trim();
-        const headers = {
-          'Authorization': auth(),
-          'Content-Type': 'application/json'
-        };
-        const idem = j('sshIdem').value.trim();
-        if (idem) headers['Idempotency-Key'] = idem;
-
-        const res = await fetch(URL_SSH, {
-          method: 'POST',
-          headers,
-          body
-        });
-        const data = await res.json();
-        out.textContent = JSON.stringify(data, null, 2);
-      } catch (e) {
-        out.textContent = `Error: ${e.message}`;
-      }
-    }
-
-    async function tryPostSSHBatch() {
-      const out = j('postSSHBatchResponse');
-      out.textContent = 'Loading...';
-      try {
-        // Optionally autofill (kept as a no-op since the textarea already has a sample)
-        const body = j('sshPostBatchBody').value.trim();
-
-        const res = await fetch(URL_SSH, {
-          method: 'POST',
-          headers: {
-            'Authorization': auth(),
-            'Content-Type': 'application/json'
+      // Create or update Top IPs bar chart
+      destroyIfExists('topIpChart');
+      if (topIpChart) topIpChart.destroy();
+      topIpChart = new Chart(document.getElementById('topIpChart'), {
+        type: 'bar',
+        data: {
+          labels: top.labels,
+          datasets: [{
+            label: 'Failed logins',
+            data: top.counts,
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          scales: {
+            x: { beginAtZero: true, title: { text: 'Count', display: true } },
+            y: { title: { text: 'Source IP', display: true } }
           },
-          body
-        });
-        const data = await res.json();
-        out.textContent = JSON.stringify(data, null, 2);
-      } catch (e) {
-        out.textContent = `Error: ${e.message}`;
-      }
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` ${ctx.raw} failed logins`
+              }
+            }
+          }
+        }
+      });
+
+      // Criticality stacked 100% chart
+      const crit = aggregateCriticality(items);
+      destroyIfExists('critChart');
+      if (critChart) critChart.destroy();
+      critChart = new Chart(document.getElementById('critChart'), {
+        type: 'bar',
+        data: {
+          labels: crit.labels,
+          datasets: [
+            { label: 'Alert', data: crit.alertPct, stack: 'stack1' },
+            { label: 'Non-alert', data: crit.okPct, stack: 'stack1' }
+          ]
+        },
+        options: {
+          indexAxis: 'x',
+          responsive: true,
+          scales: {
+            x: { stacked: true, title: { text: 'Criticality', display: true } },
+            y: {
+              stacked: true,
+              beginAtZero: true,
+              max: 100,
+              ticks: { callback: (v) => v + '%' },
+              title: { text: 'Windows (%)', display: true }
+            }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                afterBody: (items) => {
+                  const idx = items[0].dataIndex;
+                  const a = Math.round(crit.alertCnt[idx]);
+                  const t = Math.round(crit.totalCnt[idx]);
+                  const na = t - a;
+                  return [`Alerts: ${a} / ${t}`, `Non-alert: ${na} / ${t}`];
+                }
+              }
+            },
+            legend: { labels: { boxWidth: 12 } }
+          }
+        }
+      });
     }
+
+    // Auto-load on first paint
+    window.addEventListener('DOMContentLoaded', () => {
+      loadData();
+    });
   </script>
-
 </body>
 </html>
-  
